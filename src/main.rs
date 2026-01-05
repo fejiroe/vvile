@@ -1,18 +1,11 @@
-fn main() -> std::io::Result<()> {
-    ratatui::run(|mut terminal| {
-        loop {
-            terminal.draw(render)?;
-            if should_quit()? {
-                break Ok(());
-            }
-        }
-    })
-}
+use std::io::{self, Write, stdout, Read, Result, Error};
+use ratatui::termion::raw::IntoRawMode;
 
-fn render(frame: &mut ratatui::Frame) {
-    // ...
-}
-
-fn should_quit() -> std::io::Result<bool> {
-    // ...
+fn main() -> Result<(),> {
+    let mut stdout = stdout().into_raw_mode()?;
+    for b in io::stdin().bytes() {
+        let c = b.unwrap() as char;
+        println!("{}", c);
+    }
+    Ok(())
 }
