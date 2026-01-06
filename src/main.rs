@@ -16,23 +16,94 @@ struct Location {
     y: usize,
 }
 
+#[derive(Clone)]
+struct Buffer {
+    lines: Vec<String>,
+}
+
+impl Default for Buffer {
+    fn default() -> Self {
+        Self {
+            lines: vec![String::new()],
+        }
+    }
+}
+
+impl Buffer {
+    pub fn insert_char(&mut self, loc: &Location, c: char) {
+        let line = &mut self.lines[loc.y];
+        while line.len() <= loc.x {
+            line.push(' ');
+        }
+        line.insert(loc.x, c);
+    }
+    pub fn delete_char(&mut self, loc: &Location) -> bool {
+        if loc.y == 0 && loc.x == 0 {
+            return false;
+        }
+        let line = &mut self.lines[loc.y];
+        if loc.x > 0 {
+            line.remove(loc.x - 1);
+            true
+        } else {
+            let prev_line = self.lines.remove(loc.y);
+            self.lines[loc.y - 1].push_str(&prev_line);
+            true
+        }
+    }
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+    pub fn line_at(&self, y: usize) -> &str {
+        self.lines.get(y).map(|s| s.as_str()).unwrap_or("")
+    }
+}
+
+#[derive(Default)]
+struct View {
+    buffer: Buffer,
+}
+impl View {
+    fn render(&self, stdout: &mut std::io::Stdout) -> Result<()> {
+        write!(
+            stdout,
+            "{}{}",
+            ratatui::termion::clear::All,
+            ratatui::termion::cursor::Goto(1, 1)
+        )?;
+        for (idx, line) in self.buffer.lines.iter().enumerate() {
+            write!(stdout, "{}\r\n", line)?;
+        }
+        stdout.flush()
+    }
+}
+
 struct Editor {
     mode: Mode,
+    buffer: Buffer,
+    view: View,
     location: Location,
     max_cols: usize,
     max_rows: usize,
 }
 
-impl Editor {
-    fn new() -> Self {
+impl Default for Editor {
+    fn default() -> Self {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
         Self {
             mode: Mode::Normal,
+            buffer: Buffer::default(),
+            view: View {
+                buffer: Buffer::default(),
+            },
             location: Location { x: 0, y: 0 },
             max_cols: cols as usize,
             max_rows: rows as usize,
         }
     }
+}
+
+impl Editor {
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
     }
@@ -113,14 +184,16 @@ impl Editor {
                 },
                 Mode::Edit => match key {
                     Key::Char(c) => {
-                        write!(stdout, "{}", c)?;
+                        self.buffer.insert_char(&self.location, c);
+                        self.view.buffer = self.buffer.clone();
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
                         self.handle_cursor(key, &mut stdout)?
                     }
                     Key::Backspace => {
-                        self.move_left(&mut stdout)?;
-                        write!(stdout, "\x08 \x08")?;
+                        if self.buffer.delete_char(&self.location) {
+                            self.move_left(&mut stdout)?;
+                        }
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
@@ -128,6 +201,7 @@ impl Editor {
                     _ => {}
                 },
             }
+            self.view.render(&mut stdout)?;
             stdout.flush().unwrap();
         }
         Ok(())
@@ -135,7 +209,7 @@ impl Editor {
 }
 
 fn main() -> Result<()> {
-    Editor::new().run();
+    Editor::default().run();
     Ok(())
 }
 
