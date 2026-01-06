@@ -51,11 +51,11 @@ impl Buffer {
             true
         }
     }
-    pub fn line_count(&self) -> usize {
-        self.lines.len()
-    }
     pub fn line_at(&self, y: usize) -> &str {
         self.lines.get(y).map(|s| s.as_str()).unwrap_or("")
+    }
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
     }
 }
 
@@ -119,12 +119,16 @@ impl Editor {
     fn move_left(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.location.x > 0 {
             self.location.x -= 1;
+        } else if self.location.x > 0 {
+            self.location.x -= 1;
+            self.location.x = self.buffer.line_at(self.location.y).len();
         }
         self.update_cursor(stdout)?;
         Ok(())
     }
     fn move_right(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        if self.location.x + 1 < self.max_cols {
+        let current_line_len = self.buffer.line_at(self.location.y).len();
+        if self.location.x + 1 < current_line_len {
             self.location.x += 1;
         }
         self.update_cursor(stdout)?;
@@ -134,12 +138,18 @@ impl Editor {
         if self.location.y > 0 {
             self.location.y -= 1;
         }
+        if self.location.y >= self.buffer.line_count() {
+            self.location.y = self.buffer.line_count().saturating_sub(1);
+        }
         self.update_cursor(stdout)?;
         Ok(())
     }
     fn move_down(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.location.y + 1 < self.max_rows {
             self.location.y += 1;
+        }
+        if self.location.y >= self.buffer.line_count() {
+            self.location.y = self.buffer.line_count().saturating_sub(1);
         }
         self.update_cursor(stdout)?;
         Ok(())
@@ -192,8 +202,9 @@ impl Editor {
                     }
                     Key::Backspace => {
                         if self.buffer.delete_char(&self.location) {
-                            self.move_left(&mut stdout)?;
+                            self.location.x = self.buffer.line_at(self.location.y).len();
                         }
+                        self.view.buffer = self.buffer.clone();
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
@@ -209,7 +220,8 @@ impl Editor {
 }
 
 fn main() -> Result<()> {
-    Editor::default().run();
+    let mut editor = Editor::default();
+    editor.run()?;
     Ok(())
 }
 
