@@ -195,7 +195,9 @@ impl Editor {
                 Mode::Edit => match key {
                     Key::Char(c) => {
                         self.buffer.insert_char(&self.location, c);
+                        self.location.x += 1;
                         self.view.buffer = self.buffer.clone();
+                        self.update_cursor(&mut stdout)?;
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
                         self.handle_cursor(key, &mut stdout)?
