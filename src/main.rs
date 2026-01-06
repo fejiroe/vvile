@@ -20,7 +20,6 @@ impl Editor {
         for k in stdin.keys() {
             let key = k.unwrap();
             match key {
-                Key::Char(c) => println!("{}", c),
                 Key::Ctrl(c) => match c {
                     'q' => break, 
                     _ => {}
