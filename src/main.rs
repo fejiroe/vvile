@@ -7,7 +7,7 @@ use std::io::{Error, Read, Result, Write, stdin, stdout};
 
 enum Mode {
     Normal,
-    Insert,
+    Edit,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -24,19 +24,19 @@ struct Editor {
 }
 
 impl Editor {
-    fn default() -> Self {
+    fn new() -> Self {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
         Self {
             mode: Mode::Normal,
             location: Location { x: 0, y: 0 },
             max_cols: cols as usize,
-            max_rows: cols as usize,
+            max_rows: rows as usize,
         }
     }
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
     }
-    fn udate_cursor(&self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn update_cursor(&self, stdout: &mut std::io::Stdout) -> Result<()> {
         write!(
             stdout,
             "{}",
@@ -49,28 +49,38 @@ impl Editor {
         if self.location.x > 0 {
             self.location.x -= 1;
         }
-        self.udate_cursor(stdout)?;
+        self.update_cursor(stdout)?;
         Ok(())
     }
     fn move_right(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.location.x + 1 < self.max_cols {
             self.location.x += 1;
         }
-        self.udate_cursor(stdout)?;
+        self.update_cursor(stdout)?;
         Ok(())
     }
     fn move_up(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.location.y > 0 {
             self.location.y -= 1;
         }
-        self.udate_cursor(stdout)?;
+        self.update_cursor(stdout)?;
         Ok(())
     }
     fn move_down(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         if self.location.y + 1 < self.max_rows {
             self.location.y += 1;
         }
-        self.udate_cursor(stdout)?;
+        self.update_cursor(stdout)?;
+        Ok(())
+    }
+    fn handle_cursor(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
+        match key {
+            Key::Left => self.move_left(stdout)?,
+            Key::Right => self.move_right(stdout)?,
+            Key::Up => self.move_up(stdout)?,
+            Key::Down => self.move_down(stdout)?,
+            _ => {}
+        }
         Ok(())
     }
     fn run(&mut self) -> Result<()> {
@@ -86,28 +96,27 @@ impl Editor {
         .unwrap();
         stdout.flush().unwrap();
         for k in stdin.keys() {
-            let key = k.unwrap();
+            let key = k?;
             match self.mode {
                 Mode::Normal => match key {
                     // Key::Char('a') => ,
-                    Key::Char('i') => self.set_mode(Mode::Insert),
-                    Key::Left => self.move_left(&mut stdout)?,
-                    Key::Right => self.move_right(&mut stdout)?,
-                    Key::Up => self.move_up(&mut stdout)?,
-                    Key::Down => self.move_down(&mut stdout)?,
+                    Key::Char('i') => self.set_mode(Mode::Edit),
                     // Key::Char('x') => ,
                     // Key::Char('s') => ,
                     // Key::Char('r') => ,
                     // Key::Char('v') => ,
-                    Key::Ctrl(c) => match c {
-                        'q' => break,
-                        _ => {}
-                    },
+                    Key::Left | Key::Right | Key::Up | Key::Down => {
+                        self.handle_cursor(key, &mut stdout)?
+                    }
+                    Key::Ctrl('q') => break,
                     _ => {}
                 },
-                Mode::Insert => match key {
+                Mode::Edit => match key {
                     Key::Char(c) => {
                         write!(stdout, "{}", c)?;
+                    }
+                    Key::Left | Key::Right | Key::Up | Key::Down => {
+                        self.handle_cursor(key, &mut stdout)?
                     }
                     Key::Backspace => {
                         self.move_left(&mut stdout)?;
@@ -116,11 +125,6 @@ impl Editor {
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
                     }
-                    Key::Char('i') => self.set_mode(Mode::Insert),
-                    Key::Left => self.move_left(&mut stdout)?,
-                    Key::Right => self.move_right(&mut stdout)?,
-                    Key::Up => self.move_up(&mut stdout)?,
-                    Key::Down => self.move_down(&mut stdout)?,
                     _ => {}
                 },
             }
@@ -131,7 +135,7 @@ impl Editor {
 }
 
 fn main() -> Result<()> {
-    Editor::default().run();
+    Editor::new().run();
     Ok(())
 }
 
