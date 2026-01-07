@@ -5,6 +5,8 @@ simple modal editor in rust.
 "cargo build --release" and copy wherever appropriate or "cargo install --path ."
 
 todo:
+
+- proper viewport: infinite scroll, handle files that don't fit on screen
 - terminal size
 - undo/redo
 - about / help / man screen/popup
