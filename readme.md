@@ -9,6 +9,7 @@ todo:
 - more motions
 - cmds
 - visual/select mode
+- config
 - status line
 - syntax highlighting
 

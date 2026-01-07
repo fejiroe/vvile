@@ -262,6 +262,20 @@ impl Editor {
                         self.view.buffer = self.buffer.clone();
                         self.update_cursor(&mut stdout)?;
                     }
+                    Key::Char('\t') => {
+                        let tab_width = 4;
+                        let mut i: usize = 0;
+                        while i > tab_width {
+                            i += 1;
+                            self.buffer.insert_char(&self.location, ' ');
+                        }
+                        let col_after_insertion = self.location.x + tab_width;
+                        let target_col =
+                            ((col_after_insertion + tab_width - 1) / tab_width) * tab_width;
+                        self.location.x = target_col;
+                        self.update_cursor(&mut stdout)?;
+                        self.view.buffer = self.buffer.clone();
+                    }
                     Key::Char(c) => {
                         self.buffer.insert_char(&self.location, c);
                         self.location.x += 1;
