@@ -5,6 +5,7 @@ use ratatui::termion::raw::IntoRawMode;
 use ratatui::termion::terminal_size;
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 use std::io::{Error, Read, Result, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 
@@ -140,7 +141,18 @@ impl Default for Editor {
 }
 
 impl Editor {
-    fn open_file(&mut self, at: &Path) {}
+    fn open_file(&mut self, at: &Path) -> Result<()> {
+        self.current_file = at.to_path_buf();
+        match self.buffer.read_file(at) {
+            Ok(()) => {}
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                self.buffer = Buffer::default();
+            }
+            Err(e) => return Err(e),
+        }
+        self.view.buffer = self.buffer.clone();
+        Ok(())
+    }
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
     }
@@ -209,7 +221,6 @@ impl Editor {
         Ok(())
     }
     fn run(&mut self) -> Result<()> {
-        // let mut size = terminal_size().unwrap();
         let stdin = stdin();
         let mut stdout = stdout().into_raw_mode()?;
         write!(
@@ -300,6 +311,10 @@ impl Editor {
 
 fn main() -> Result<()> {
     let mut editor = Editor::default();
+    if let Some(file_name) = env::args().nth(1) {
+        let path = PathBuf::from(&file_name);
+        editor.open_file(&path);
+    }
     editor.run()?;
     Ok(())
 }
