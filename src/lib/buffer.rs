@@ -36,8 +36,6 @@ impl Buffer {
         } else {
             let current_line = self.lines.remove(loc.y);
             self.lines[loc.y - 1].push_str(&current_line);
-            let new_y = loc.y - 1;
-            let new_x = std::cmp::min(loc.x, self.lines[new_y].len());
         }
         true
     }
