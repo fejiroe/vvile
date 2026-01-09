@@ -21,24 +21,20 @@ pub struct Editor {
     buffer: Buffer,
     view: View,
     location: Location,
-    max_cols: usize,
-    max_rows: usize,
 }
 
 impl Default for Editor {
     fn default() -> Self {
-        let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
         Self {
             current_file: PathBuf::new(),
             mode: Mode::Normal,
             buffer: Buffer::default(),
             view: View {
-                buffer: Buffer::default(),
-                needs_update: false,
+                offset_y: 0,
+                offset_x: 0,
+                ..Default::default()
             },
             location: Location { x: 0, y: 0 },
-            max_cols: cols as usize,
-            max_rows: rows as usize,
         }
     }
 }
@@ -59,23 +55,37 @@ impl Editor {
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
     }
+    fn update_view(&mut self) {
+        let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
+        let max_cols = cols as usize;
+        let max_rows = rows as usize;
+        if self.location.y < self.view.offset_y {
+            self.view.offset_y = self.location.y;
+        } else if self.location.y >= self.view.offset_y + max_rows {
+            self.view.offset_y = self.location.y - max_rows + 1;
+        }
+        if self.location.x < self.view.offset_x {
+            self.view.offset_x = self.location.x;
+        } else if self.location.x >= self.view.offset_x + max_cols {
+            self.view.offset_x = self.location.x - max_cols + 1;
+        }
+    }
     fn update_cursor(&self, stdout: &mut std::io::Stdout) -> Result<()> {
-        write!(
-            stdout,
-            "{}",
-            ratatui::termion::cursor::Goto(self.location.x as u16 + 1, self.location.y as u16 + 1)
-        )?;
+        let cur_x = (self.location.x as i32 - self.view.offset_x as i32).max(0) as u16 + 1;
+        let cur_y = (self.location.y as i32 - self.view.offset_y as i32).max(0) as u16 + 1;
+        write!(stdout, "{}", ratatui::termion::cursor::Goto(cur_x, cur_y))?;
         stdout.flush()?;
         Ok(())
     }
     fn move_left(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let line_len = self.buffer.line_at(self.location.y).len();
         if self.location.x > 0 {
             self.location.x -= 1;
         } else if self.location.y > 0 {
             self.location.y -= 1;
-            self.location.x = line_len;
+            let prev_line_len = self.buffer.line_at(self.location.y).len();
+            self.location.x = prev_line_len;
         }
+        self.update_view();
         self.update_cursor(stdout)?;
         Ok(())
     }
@@ -87,6 +97,7 @@ impl Editor {
             self.location.y += 1;
             self.location.x = 0;
         }
+        self.update_view();
         self.update_cursor(stdout)?;
         Ok(())
     }
@@ -98,6 +109,7 @@ impl Editor {
         if self.location.x > line_len {
             self.location.x = line_len;
         }
+        self.update_view();
         self.update_cursor(stdout)?;
         Ok(())
     }
@@ -110,6 +122,7 @@ impl Editor {
         if self.location.x >= line_len {
             self.location.x = line_len;
         }
+        self.update_view();
         self.update_cursor(stdout)?;
         Ok(())
     }
@@ -134,6 +147,7 @@ impl Editor {
         )
         .unwrap();
         term.stdout.flush().unwrap();
+        self.update_view();
         for k in stdin.keys() {
             let key = k?;
             match self.mode {
@@ -164,6 +178,7 @@ impl Editor {
                             .insert(self.location.y + 1, right.to_string());
                         self.location.y += 1;
                         self.location.x = 0;
+                        self.update_view();
                         self.view.buffer = self.buffer.clone();
                         self.update_cursor(&mut term.stdout)?;
                     }
@@ -175,12 +190,14 @@ impl Editor {
                         let target_col =
                             ((self.location.x + tab_width - 1) / tab_width) * tab_width;
                         self.location.x = target_col;
+                        self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                         self.view.buffer = self.buffer.clone();
                     }
                     Key::Char(c) => {
                         self.buffer.insert_char(&self.location, c);
                         self.location.x += 1;
+                        self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                         self.view.buffer = self.buffer.clone();
                     }
@@ -193,12 +210,14 @@ impl Editor {
                             } else if self.location.x > 0 {
                                 self.location.x -= 1;
                             }
+                            self.update_view();
                             self.update_cursor(&mut term.stdout)?
                         }
                         self.view.buffer = self.buffer.clone();
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
+                        self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
@@ -209,6 +228,7 @@ impl Editor {
                 Mode::Command => match key {
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
+                        self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     _ => {}
