@@ -6,7 +6,6 @@ simple modal editor in rust.
 
 todo:
 
-- fix line wrap; cursor goes to next line a character before expected
 - terminal size
 - undo/redo
 - about / help / man screen/popup

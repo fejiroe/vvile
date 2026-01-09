@@ -83,7 +83,7 @@ impl Editor {
         } else if self.location.y > 0 {
             self.location.y -= 1;
             let prev_line_len = self.buffer.line_at(self.location.y).len();
-            self.location.x = prev_line_len;
+            self.location.x = prev_line_len - 1;
         }
         self.update_view();
         self.update_cursor(stdout)?;
