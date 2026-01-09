@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::buffer::Buffer;
 use crate::buffer::Location;
+use crate::cursor::Cursor;
 use crate::terminal::Terminal;
 use crate::view::View;
 
@@ -19,9 +20,9 @@ enum Mode {
 pub struct Editor {
     current_file: PathBuf,
     mode: Mode,
-    buffer: Buffer,
+    pub buffer: Buffer,
     view: View,
-    location: Location,
+    cursor: Cursor,
 }
 
 impl Default for Editor {
@@ -35,7 +36,7 @@ impl Default for Editor {
                 offset_x: 0,
                 ..Default::default()
             },
-            location: Location { x: 0, y: 0 },
+            cursor: Cursor::default(),
         }
     }
 }
@@ -50,7 +51,6 @@ impl Editor {
             }
             Err(e) => return Err(e),
         }
-        self.location = Location { x: 0, y: 0 };
         self.view.offset_x = 0;
         self.view.offset_y = 0;
         Ok(())
@@ -67,91 +67,32 @@ impl Editor {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
         let max_cols = cols as usize;
         let max_rows = rows as usize;
-        if self.location.y < self.view.offset_y {
-            self.view.offset_y = self.location.y;
-        } else if self.location.y > self.view.offset_y + max_rows {
-            self.view.offset_y = self.location.y - max_rows + 1;
-        }
-        if self.location.x < self.view.offset_x {
-            self.view.offset_x = self.location.x;
-        } else if self.location.x >= self.view.offset_x + max_cols {
-            self.view.offset_x = self.location.x - max_cols + 1;
-        }
+        let new_offsets = self.cursor.maybe_scroll(&self.view);
+        self.view.offset_x = new_offsets.0.min(max_cols.saturating_sub(1));
+        self.view.offset_y = new_offsets.1.min(max_rows.saturating_sub(1));
     }
     fn update_cursor(&self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let cur_x = (self.location.x as i32 - self.view.offset_x as i32).max(0) as u16 + 1;
-        let cur_y = (self.location.y as i32 - self.view.offset_y as i32).max(0) as u16 + 1;
-        write!(stdout, "{}", ratatui::termion::cursor::Goto(cur_x, cur_y))?;
-        stdout.flush()?;
-        Ok(())
+        self.cursor
+            .render_cursor(self.view.offset_x, self.view.offset_y, stdout)
     }
-    fn move_left(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        if self.location.x > 0 {
-            self.location.x -= 1;
-        } else if self.location.y > 0 {
-            self.location.y -= 1;
-            let prev_line_len = self.buffer.line_at(self.location.y).len();
-            self.location.x = prev_line_len.saturating_sub(1);
-        }
-        self.update_view();
-        self.update_cursor(stdout)?;
-        Ok(())
-    }
-    fn move_right(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let line_len = self.buffer.line_at(self.location.y).len();
-        if self.location.x + 1 < line_len {
-            self.location.x += 1;
-        } else if self.location.y + 1 < self.buffer.line_count() {
-            self.location.y += 1;
-            self.location.x = 0;
-        }
-        self.update_view();
-        self.update_cursor(stdout)?;
-        Ok(())
-    }
-    fn move_up(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        if self.location.y > 0 {
-            self.location.y -= 1;
-        }
-        let line_len = self.buffer.line_at(self.location.y).len();
-        if self.location.x > line_len {
-            self.location.x = line_len;
-        }
-        self.update_view();
-        self.update_cursor(stdout)?;
-        Ok(())
-    }
-    fn move_down(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
-        let last_line = self.buffer.line_count().saturating_sub(1);
-        if self.location.y < last_line {
-            self.location.y += 1;
-        }
-        let line_len = self.buffer.line_at(self.location.y).len();
-        if self.location.x >= line_len {
-            self.location.x = line_len;
-        }
-        self.update_view();
-        self.update_cursor(stdout)?;
-        Ok(())
-    }
-    fn handle_cursor(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_cursor(&mut self, key: Key) -> Result<()> {
         match key {
-            Key::Left => self.move_left(stdout)?,
-            Key::Right => self.move_right(stdout)?,
-            Key::Up => self.move_up(stdout)?,
-            Key::Down => self.move_down(stdout)?,
+            Key::Left => self.cursor.move_left(&self.buffer),
+            Key::Right => self.cursor.move_right(&self.buffer),
+            Key::Up => self.cursor.move_up(&self.buffer),
+            Key::Down => self.cursor.move_down(&self.buffer),
             _ => {}
         }
         Ok(())
     }
     fn delete_under_cursor(&mut self) {
-        let line_len = self.buffer.line_at(self.location.y).len();
-        if self.location.x < line_len {
-            let line = &mut self.buffer.lines[self.location.y];
-            line.remove(self.location.x);
-        } else if self.location.y + 1 < self.buffer.line_count() {
-            let next = self.buffer.lines.remove(self.location.y + 1);
-            self.buffer.lines[self.location.y].push_str(&next);
+        let line_len = self.buffer.line_at(self.cursor.y).len();
+        if self.cursor.x < line_len {
+            let line = &mut self.buffer.lines[self.cursor.y];
+            line.remove(self.cursor.x);
+        } else if self.cursor.y + 1 < self.buffer.line_count() {
+            let next = self.buffer.lines.remove(self.cursor.y + 1);
+            self.buffer.lines[self.cursor.y].push_str(&next);
         }
     }
     pub fn run(&mut self) -> Result<()> {
@@ -172,12 +113,12 @@ impl Editor {
             match self.mode {
                 Mode::Normal => match key {
                     Key::Char('a') => {
-                        let line_len = self.buffer.line_at(self.location.y).len();
-                        if self.location.x < line_len {
-                            self.location.x += 1;
-                        } else if self.location.y + 1 < self.buffer.line_count() {
-                            self.location.y += 1;
-                            self.location.x = 0;
+                        let line_len = self.buffer.line_at(self.cursor.y).len();
+                        if self.cursor.x < line_len {
+                            self.cursor.x += 1;
+                        } else if self.cursor.y + 1 < self.buffer.line_count() {
+                            self.cursor.y += 1;
+                            self.cursor.x = 0;
                         }
                         self.set_mode(Mode::Edit);
                     }
@@ -193,56 +134,53 @@ impl Editor {
                         self.update_cursor(&mut term.stdout)?;
                         self.set_mode(Mode::Edit);
                     }
-
                     // Key::Char('r') =>
                     // Key::Char('u') => ,
                     // Key::Char('v') => ,
                     // Key::Char('/') => ,
                     // Key::Char('?') => ,
-                    Key::Left | Key::Right | Key::Up | Key::Down => {
-                        self.handle_cursor(key, &mut term.stdout)?
-                    }
+                    Key::Left | Key::Right | Key::Up | Key::Down => self.handle_cursor(key)?,
                     Key::Ctrl('s') => self.write_file(&self.current_file)?,
                     Key::Ctrl('q') => break,
                     _ => {}
                 },
                 Mode::Edit => match key {
                     Key::Char('\n') => {
-                        let cur_line = self.buffer.line_at(self.location.y).to_owned();
-                        let (left, right) = cur_line.split_at(self.location.x);
-                        self.buffer.lines[self.location.y] = left.to_string();
+                        let cur_line = self.buffer.line_at(self.cursor.y).to_owned();
+                        let (left, right) = cur_line.split_at(self.cursor.x);
+                        self.buffer.lines[self.cursor.y] = left.to_string();
                         self.buffer
                             .lines
-                            .insert(self.location.y + 1, right.to_string());
-                        self.location.y += 1;
-                        self.location.x = 0;
+                            .insert(self.cursor.y + 1, right.to_string());
+                        self.cursor.y += 1;
+                        self.cursor.x = 0;
                         self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Char('\t') => {
                         let tab_width = 4;
                         for _ in 0..tab_width {
-                            self.buffer.insert_char(&self.location, ' ');
+                            self.buffer.insert_char(&(Location::from(self.cursor)), ' ');
                         }
-                        let target_col = self.location.x.div_ceil(tab_width) * tab_width;
-                        self.location.x = target_col;
+                        let target_col = self.cursor.x.div_ceil(tab_width) * tab_width;
+                        self.cursor.x = target_col;
                         self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Char(c) => {
-                        self.buffer.insert_char(&self.location, c);
-                        self.location.x += 1;
+                        self.buffer.insert_char(&(Location::from(self.cursor)), c);
+                        self.cursor.x += 1;
                         self.update_view();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Backspace => {
-                        if self.buffer.delete_char(&self.location) {
-                            if self.location.x == 0 && self.location.y > 0 {
-                                self.location.y -= 1;
-                                let prev_len = self.buffer.line_at(self.location.y).len();
-                                self.location.x = std::cmp::min(prev_len, self.location.x);
-                            } else if self.location.x > 0 {
-                                self.location.x -= 1;
+                        if self.buffer.delete_char(&&(Location::from(self.cursor))) {
+                            if self.cursor.x == 0 && self.cursor.y > 0 {
+                                self.cursor.y -= 1;
+                                let prev_len = self.buffer.line_at(self.cursor.y).len();
+                                self.cursor.x = std::cmp::min(prev_len, self.cursor.x);
+                            } else if self.cursor.x > 0 {
+                                self.cursor.x -= 1;
                             }
                             self.update_view();
                             self.update_cursor(&mut term.stdout)?
@@ -254,7 +192,8 @@ impl Editor {
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
-                        self.handle_cursor(key, &mut term.stdout)?;
+                        self.handle_cursor(key)?;
+                        self.update_cursor(&mut term.stdout)?;
                     }
                     _ => {}
                 },

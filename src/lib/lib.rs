@@ -7,3 +7,5 @@ pub mod editor;
 pub use editor::Editor;
 pub mod view;
 pub use view::View;
+pub mod cursor;
+pub use cursor::Cursor;
