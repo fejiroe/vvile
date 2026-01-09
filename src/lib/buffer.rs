@@ -67,9 +67,4 @@ impl Buffer {
         }
         Ok(())
     }
-    pub fn write_file(&self, path: &Path) -> Result<()> {
-        let out = self.buffer_to_string();
-        fs::write(path, out)?;
-        Ok(())
-    }
 }

@@ -1,5 +1,6 @@
 use ratatui::termion::event::Key;
 use ratatui::termion::input::TermRead;
+use std::fs;
 use std::io::ErrorKind;
 use std::io::{Result, Write, stdin};
 use std::path::{Path, PathBuf};
@@ -52,6 +53,11 @@ impl Editor {
         self.location = Location { x: 0, y: 0 };
         self.view.offset_x = 0;
         self.view.offset_y = 0;
+        Ok(())
+    }
+    pub fn write_file(&self, path: &Path) -> Result<()> {
+        let out = self.buffer.buffer_to_string();
+        fs::write(path, out)?;
         Ok(())
     }
     fn set_mode(&mut self, mode: Mode) {
@@ -155,12 +161,16 @@ impl Editor {
             let key = k?;
             match self.mode {
                 Mode::Normal => match key {
-                    /*  // basic idea, will crash w no guards in edge cases
-                        Key::Char('a') => {
+                    Key::Char('a') => {
+                        let line_len = self.buffer.line_at(self.location.y).len();
+                        if self.location.x < line_len {
                             self.location.x += 1;
-                            self.set_mode(Mode::Edit)
+                        } else if self.location.y + 1 < self.buffer.line_count() {
+                            self.location.y += 1;
+                            self.location.x = 0;
                         }
-                    */
+                        self.set_mode(Mode::Edit);
+                    }
                     Key::Char('i') => self.set_mode(Mode::Edit),
                     /*
                     Key::Char('x') => { // crashes if empty/no char at location
@@ -179,7 +189,7 @@ impl Editor {
                     Key::Left | Key::Right | Key::Up | Key::Down => {
                         self.handle_cursor(key, &mut term.stdout)?
                     }
-                    Key::Ctrl('s') => self.buffer.write_file(&self.current_file)?,
+                    Key::Ctrl('s') => self.write_file(&self.current_file)?,
                     Key::Ctrl('q') => break,
                     _ => {}
                 },
