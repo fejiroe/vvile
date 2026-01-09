@@ -147,7 +147,8 @@ impl Editor {
         )
         .unwrap();
         term.stdout.flush().unwrap();
-        self.update_view();
+        self.view.render(&mut term.stdout)?;
+        self.update_cursor(&mut term.stdout)?;
         for k in stdin.keys() {
             let key = k?;
             match self.mode {
