@@ -112,6 +112,7 @@ impl Editor {
             let key = k?;
             match self.mode {
                 Mode::Normal => match key {
+                    Key::Char(':') => self.set_mode(Mode::Command),
                     Key::Char('a') => {
                         let line_len = self.buffer.line_at(self.cursor.y).len();
                         if self.cursor.x < line_len {
