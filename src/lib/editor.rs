@@ -52,7 +52,6 @@ impl Editor {
         self.location = Location { x: 0, y: 0 };
         self.view.offset_x = 0;
         self.view.offset_y = 0;
-        self.view.buffer = self.buffer.clone();
         Ok(())
     }
     fn set_mode(&mut self, mode: Mode) {
@@ -150,17 +149,29 @@ impl Editor {
         )
         .unwrap();
         term.stdout.flush().unwrap();
-        self.view.render(&mut term.stdout)?;
+        self.view.render(&mut term.stdout, &self.buffer)?;
         self.update_cursor(&mut term.stdout)?;
         for k in stdin.keys() {
             let key = k?;
             match self.mode {
                 Mode::Normal => match key {
-                    // Key::Char('a') => ,
+                    /*  // basic idea, will crash w no guards in edge cases
+                        Key::Char('a') => {
+                            self.location.x += 1;
+                            self.set_mode(Mode::Edit)
+                        }
+                    */
                     Key::Char('i') => self.set_mode(Mode::Edit),
-                    // Key::Char('x') => ,
-                    // Key::Char('s') => ,
-                    // Key::Char('r') => ,
+                    /*
+                    Key::Char('x') => { // crashes if empty/no char at location
+                        self.buffer.delete_char(&self.location); // off by one for some reason lol
+                        self.update_view();
+                        self.view.buffer = self.buffer.clone();
+                        self.update_cursor(&mut term.stdout)?
+                    }
+                    */
+                    // Key::Char('s') => {//do same as x, but enter edit mode}
+                    // Key::Char('r') =>
                     // Key::Char('u') => ,
                     // Key::Char('v') => ,
                     // Key::Char('/') => ,
@@ -183,7 +194,6 @@ impl Editor {
                         self.location.y += 1;
                         self.location.x = 0;
                         self.update_view();
-                        self.view.buffer = self.buffer.clone();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Char('\t') => {
@@ -195,14 +205,12 @@ impl Editor {
                             ((self.location.x + tab_width - 1) / tab_width) * tab_width;
                         self.location.x = target_col;
                         self.update_view();
-                        self.view.buffer = self.buffer.clone();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Char(c) => {
                         self.buffer.insert_char(&self.location, c);
                         self.location.x += 1;
                         self.update_view();
-                        self.view.buffer = self.buffer.clone();
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Backspace => {
@@ -215,10 +223,8 @@ impl Editor {
                                 self.location.x -= 1;
                             }
                             self.update_view();
-                            self.view.buffer = self.buffer.clone();
                             self.update_cursor(&mut term.stdout)?
                         }
-                        self.view.buffer = self.buffer.clone();
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
@@ -239,7 +245,7 @@ impl Editor {
                     _ => {}
                 },
             }
-            self.view.render(&mut term.stdout)?;
+            self.view.render(&mut term.stdout, &self.buffer)?;
             self.update_cursor(&mut term.stdout)?;
             term.stdout.flush().unwrap();
         }
