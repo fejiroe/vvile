@@ -1,7 +1,7 @@
 use ratatui::termion::{
     cursor,
     raw::{IntoRawMode, RawTerminal},
-    screen::{ToAlternateScreen},
+    screen::{ToAlternateScreen, ToMainScreen},
 };
 use std::io::{Stdout, Write, stdout};
 
@@ -19,6 +19,7 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
+        write!(stdout(), "{}", ToMainScreen);
         let _ = write!(self.stdout, "{}", cursor::Show);
         let _ = self.stdout.flush();
     }
