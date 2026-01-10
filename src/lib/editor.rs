@@ -15,6 +15,7 @@ enum Mode {
     Normal,
     Edit,
     Command,
+    Visual,
 }
 
 pub struct Editor {
@@ -135,11 +136,14 @@ impl Editor {
                         self.update_cursor(&mut term.stdout)?;
                         self.set_mode(Mode::Edit);
                     }
+                    // Key::Char('b') =>
+                    // Key::Char('w') =>
+                    // Key::Char('e') =>
                     // Key::Char('r') =>
                     // Key::Char('u') => ,
-                    // Key::Char('v') => ,
                     // Key::Char('/') => ,
                     // Key::Char('?') => ,
+                    Key::Char('v') => self.set_mode(Mode::Visual),
                     Key::Left | Key::Right | Key::Up | Key::Down => self.handle_cursor(key)?,
                     Key::Ctrl('s') => self.write_file(&self.current_file)?,
                     Key::Ctrl('q') => break,
@@ -176,7 +180,7 @@ impl Editor {
                         self.update_cursor(&mut term.stdout)?;
                     }
                     Key::Backspace => {
-                        if self.buffer.delete_char(&&(Location::from(self.cursor))) {
+                            self.delete_under_cursor();
                             if self.cursor.x == 0 && self.cursor.y > 0 {
                                 self.cursor.y -= 1;
                                 let prev_len = self.buffer.line_at(self.cursor.y).len();
@@ -186,7 +190,6 @@ impl Editor {
                             }
                             self.update_view();
                             self.update_cursor(&mut term.stdout)?
-                        }
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
@@ -207,6 +210,15 @@ impl Editor {
                     }
                     _ => {}
                 },
+                Mode::Visual => match key {
+                    Key::Esc => {
+                        self.set_mode(Mode::Normal);
+                        self.update_view();
+                        self.update_cursor(&mut term.stdout)?;
+                    }
+                    _ => {}
+                },
+
             }
             self.view.render(&mut term.stdout, &self.buffer)?;
             self.update_cursor(&mut term.stdout)?;
