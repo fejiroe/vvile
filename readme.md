@@ -6,7 +6,6 @@ simple modal editor in rust.
 
 todo:
 
-- fix tab insert
 - undo/redo
 - about / help / man screen/popup
 - more motions

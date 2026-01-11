@@ -98,7 +98,7 @@ impl Editor {
             self.buffer.lines[self.cursor.y].push_str(&next);
         }
     }
-    fn hadle_keys(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
+    fn handle_keys(&mut self, stdout: &mut std::io::Stdout) -> Result<()> {
         let stdin = stdin();
         for k in stdin.keys() {
             let key = k?;
@@ -232,7 +232,7 @@ impl Editor {
         term.stdout.flush().unwrap();
         self.view.render(&mut term.stdout, &self.buffer)?;
         self.update_cursor(&mut term.stdout)?;
-        self.hadle_keys(&mut term.stdout)?;
+        self.handle_keys(&mut term.stdout)?;
         Ok(())
     }
 }
