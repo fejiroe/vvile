@@ -66,7 +66,7 @@ impl Editor {
     }
     fn update_view(&mut self) {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
-        let max_cols = cols as usize;
+        let _max_cols = cols as usize;
         let max_rows = rows as usize;
         let (new_offset_x, new_offset_y) = self.cursor.maybe_scroll(&self.view);
         let current_line_len = self.buffer.line_at(new_offset_y).len();
@@ -193,6 +193,7 @@ impl Editor {
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
                         self.handle_cursor(key)?;
+                        self.update_view();
                         self.update_cursor(stdout)?;
                     }
                     _ => {}
