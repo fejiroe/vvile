@@ -68,9 +68,11 @@ impl Editor {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
         let max_cols = cols as usize;
         let max_rows = rows as usize;
-        let new_offsets = self.cursor.maybe_scroll(&self.view);
-        self.view.offset_x = new_offsets.0.min(max_cols.saturating_sub(1));
-        self.view.offset_y = new_offsets.1.min(max_rows.saturating_sub(1));
+        let (new_offset_x, new_offset_y) = self.cursor.maybe_scroll(&self.view);
+        let current_line_len = self.buffer.line_at(new_offset_y).len();
+        self.view.offset_x = new_offset_x.min(current_line_len.saturating_sub(1));
+        let max_offset_y = self.buffer.line_count().saturating_sub(max_rows);
+        self.view.offset_y = new_offset_y.min(max_offset_y);
     }
     fn update_cursor(&self, stdout: &mut std::io::Stdout) -> Result<()> {
         self.cursor
@@ -133,7 +135,11 @@ impl Editor {
                     // Key::Char('/') => ,
                     // Key::Char('?') => ,
                     Key::Char('v') => self.set_mode(Mode::Visual),
-                    Key::Left | Key::Right | Key::Up | Key::Down => self.handle_cursor(key)?,
+                    Key::Left | Key::Right | Key::Up | Key::Down => {
+                        self.handle_cursor(key)?;
+                        self.update_view();
+                        self.update_cursor(stdout)?;
+                    }
                     Key::Ctrl('s') => self.write_file(&self.current_file)?,
                     Key::Ctrl('q') => break,
                     _ => {}
@@ -169,16 +175,16 @@ impl Editor {
                         self.update_cursor(stdout)?;
                     }
                     Key::Backspace => {
-                            self.delete_under_cursor();
-                            if self.cursor.x == 0 && self.cursor.y > 0 {
-                                self.cursor.y -= 1;
-                                let prev_len = self.buffer.line_at(self.cursor.y).len();
-                                self.cursor.x = std::cmp::min(prev_len, self.cursor.x);
-                            } else if self.cursor.x > 0 {
-                                self.cursor.x -= 1;
-                            }
-                            self.update_view();
-                            self.update_cursor(stdout)?
+                        self.delete_under_cursor();
+                        if self.cursor.x == 0 && self.cursor.y > 0 {
+                            self.cursor.y -= 1;
+                            let prev_len = self.buffer.line_at(self.cursor.y).len();
+                            self.cursor.x = std::cmp::min(prev_len, self.cursor.x);
+                        } else if self.cursor.x > 0 {
+                            self.cursor.x -= 1;
+                        }
+                        self.update_view();
+                        self.update_cursor(stdout)?
                     }
                     Key::Esc => {
                         self.set_mode(Mode::Normal);
@@ -207,7 +213,6 @@ impl Editor {
                     }
                     _ => {}
                 },
-
             }
             self.view.render(stdout, &self.buffer)?;
             self.update_cursor(stdout)?;
@@ -227,7 +232,7 @@ impl Editor {
         term.stdout.flush().unwrap();
         self.view.render(&mut term.stdout, &self.buffer)?;
         self.update_cursor(&mut term.stdout)?;
-        self.hadle_keys(&mut term.stdout)?; 
+        self.hadle_keys(&mut term.stdout)?;
         Ok(())
     }
 }

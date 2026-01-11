@@ -19,7 +19,7 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        write!(stdout(), "{}", ToMainScreen);
+        let _ = write!(stdout(), "{}", ToMainScreen);
         let _ = write!(self.stdout, "{}", cursor::Show);
         let _ = self.stdout.flush();
     }
