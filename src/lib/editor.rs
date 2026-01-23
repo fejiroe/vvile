@@ -71,9 +71,8 @@ impl Editor {
         let max_rows = rows as usize;
         let (new_offset_x, new_offset_y) = self.cursor.maybe_scroll(&self.view);
         let line = &self.buffer.lines[new_offset_y];
-        let current_line_len = line.raw.len();
-        let new_byte_x = *line.graphemes.get(new_offset_x).unwrap_or(&line.raw.len());
-        self.view.offset_x = new_byte_x.min(current_line_len.saturating_sub(1));
+        let current_line_len = line.grapheme_len();
+        self.view.offset_x = new_offset_x.min(current_line_len);
         let max_offset_y = self.buffer.line_count().saturating_sub(max_rows);
         self.view.offset_y = new_offset_y.min(max_offset_y);
     }
@@ -92,7 +91,7 @@ impl Editor {
         Ok(())
     }
     fn delete_under_cursor(&mut self) {
-        let line_len = self.buffer.line_at(self.cursor.y).len();
+        let line_len = self.buffer.lines[self.cursor.y].grapheme_len();
         if self.cursor.x < line_len {
             let line = &mut self.buffer.lines[self.cursor.y];
             line.remove(self.cursor.x);
@@ -181,7 +180,7 @@ impl Editor {
                         self.delete_under_cursor();
                         if self.cursor.x == 0 && self.cursor.y > 0 {
                             self.cursor.y -= 1;
-                            let prev_len = self.buffer.line_at(self.cursor.y).len();
+                            let prev_len = self.buffer.lines[self.cursor.y].grapheme_len();
                             self.cursor.x = std::cmp::min(prev_len, self.cursor.x);
                         } else if self.cursor.x > 0 {
                             self.cursor.x -= 1;

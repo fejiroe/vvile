@@ -60,7 +60,7 @@ impl Line {
         Some(&self.raw[start..end])
     }
     pub fn grapheme_len(&self) -> usize {
-        self.graphemes.len() - 1
+        self.graphemes.len().saturating_sub(1)
     }
 }
 
