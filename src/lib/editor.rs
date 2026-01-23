@@ -155,8 +155,9 @@ impl Editor {
     fn handle_edit(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
         match key {
             Key::Char('\n') => {
-                let cur_line = self.buffer.line_at(self.cursor.y).to_owned();
-                let (left, right) = cur_line.split_at(self.cursor.x);
+                let line = self.buffer.line_at(self.cursor.y).to_owned();
+                let byte_offset = self.buffer.lines[self.cursor.y].graphemes[self.cursor.x];
+                let (left, right) = line.split_at(byte_offset);
                 self.buffer.lines[self.cursor.y] = Line::from_string(left.to_owned());
                 self.buffer
                     .lines
