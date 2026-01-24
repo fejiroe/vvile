@@ -11,7 +11,6 @@ todo:
 - about / help / man screen/popup
 - more motions
 - cmds
-- graphemes
 - visual/select mode
 - config
 - status line (+ print dbg to status line)
