@@ -13,8 +13,8 @@ use crate::view::View;
 
 #[derive(Debug)]
 pub struct Editor {
-    pub current_file: PathBuf, /* shouldn't be pub */
-    pub mode: Mode,            /* shouldn't be pub */
+    pub current_file: PathBuf,
+    pub mode: Mode,
     pub buffer: Buffer,
     pub view: View,
     pub cursor: Cursor,
@@ -50,8 +50,7 @@ impl Editor {
         Ok(())
     }
     pub fn write_file(&self, path: &Path) -> Result<()> {
-        let out = self.buffer.buffer_to_string();
-        fs::write(path, out)?;
+        fs::write(path, self.buffer.buffer_to_string())?;
         Ok(())
     }
     pub fn set_mode(&mut self, mode: Mode) {
@@ -59,8 +58,7 @@ impl Editor {
     }
     pub fn update_view(&mut self) {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));
-        let _max_cols = cols as usize;
-        let max_rows = rows as usize;
+        let (_max_cols, max_rows) = (cols as usize, rows as usize);
         if self.buffer.line_count() == 0 {
             self.view.offset_x = 0;
             self.view.offset_y = 0;
@@ -68,8 +66,7 @@ impl Editor {
         }
         let (new_offset_x, new_offset_y) = self.cursor.maybe_scroll(&self.view);
         let line = &self.buffer.lines[new_offset_y];
-        let current_line_len = line.grapheme_len();
-        self.view.offset_x = new_offset_x.min(current_line_len);
+        self.view.offset_x = new_offset_x.min(line.grapheme_len());
         let max_offset_y = self.buffer.line_count().saturating_sub(max_rows);
         self.view.offset_y = new_offset_y.min(max_offset_y);
     }
