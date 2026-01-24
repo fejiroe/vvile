@@ -13,16 +13,22 @@ use crate::view::View;
 
 #[derive(Debug, Default)]
 pub struct Editor {
-    pub current_file: PathBuf,
-    pub mode: Mode,
+    current_file: Option<PathBuf>,
+    mode: Mode,
     pub buffer: Buffer,
     pub view: View,
     pub cursor: Cursor,
 }
 
 impl Editor {
+    pub fn current_file(&self) -> &Option<PathBuf> {
+        &self.current_file
+    }
+    pub fn opened_file(&self) -> Option<&Path> {
+        self.current_file.as_ref().map(|pb| pb.as_path())
+    }
     pub fn open_file(&mut self, at: &Path) -> Result<()> {
-        self.current_file = at.to_path_buf();
+        self.current_file = Some(at.to_path_buf());
         match self.buffer.read_file(at) {
             Ok(()) => {}
             Err(e) if e.kind() == ErrorKind::NotFound => {
@@ -40,6 +46,9 @@ impl Editor {
     }
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+    pub fn get_mode(&self) -> Mode {
+        self.mode
     }
     pub fn update_view(&mut self) {
         let (cols, rows) = ratatui::termion::terminal_size().unwrap_or((80, 24));

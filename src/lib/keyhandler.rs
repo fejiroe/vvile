@@ -21,7 +21,7 @@ impl<'a> KeyHandler<'a> {
     }
 
     pub fn process_key(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
-        match self.editor.mode {
+        match self.editor.get_mode() {
             Mode::Normal => self.handle_normal(key, stdout),
             Mode::Edit => self.handle_edit(key, stdout),
             Mode::Replace => self.handle_replace(key, stdout),
@@ -73,7 +73,11 @@ impl<'a> KeyHandler<'a> {
                 self.editor.update_cursor(stdout)?;
             }
             Key::Ctrl('s') => {
-                self.editor.write_file(&self.editor.current_file)?;
+                if let Some(path) = self.editor.current_file() {
+                    self.editor.write_file(path)?;
+                } else {
+                    /* how to handle? */
+                }
             }
             Key::Ctrl('q') => {
                 std::process::exit(0);

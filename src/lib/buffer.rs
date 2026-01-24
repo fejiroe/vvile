@@ -30,14 +30,14 @@ impl Line {
         offsets.push(self.raw.len());
         self.graphemes = offsets;
     }
-    pub fn insert(&mut self, index: usize, c: char) {
-        let byte_offset = self.graphemes[index];
+    pub fn insert(&mut self, i: usize, c: char) {
+        let byte_offset = self.graphemes[i];
         self.raw.insert(byte_offset, c);
         self.rebuild();
     }
-    pub fn remove(&mut self, index: usize) {
-        let start = self.graphemes[index];
-        let end = self.graphemes[index + 1];
+    pub fn remove(&mut self, i: usize) {
+        let start = self.graphemes[i];
+        let end = self.graphemes[i + 1];
         self.raw.replace_range(start..end, "");
         self.rebuild();
     }
@@ -54,9 +54,9 @@ impl Line {
         l.rebuild();
         l
     }
-    pub fn grapheme_at(&self, idx: usize) -> Option<&str> {
-        let start = *self.graphemes.get(idx)?;
-        let end = *self.graphemes.get(idx + 1)?;
+    pub fn grapheme_at(&self, i: usize) -> Option<&str> {
+        let start = *self.graphemes.get(i)?;
+        let end = *self.graphemes.get(i + 1)?;
         Some(&self.raw[start..end])
     }
     pub fn grapheme_len(&self) -> usize {
@@ -79,7 +79,6 @@ impl Default for Buffer {
 
 impl Buffer {
     pub fn insert_char(&mut self, loc: &Location, c: char) {
-        let line = &mut self.lines[loc.y];
         if self.lines.is_empty() {
             self.lines.push(Line::new());
         }
