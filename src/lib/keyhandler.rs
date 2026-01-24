@@ -5,6 +5,7 @@ use std::io::Result;
 pub enum Mode {
     Normal,
     Edit,
+    Replace,
     Command,
     Visual,
 }
@@ -22,6 +23,7 @@ impl<'a> KeyHandler<'a> {
         match self.editor.mode {
             Mode::Normal => self.handle_normal(key, stdout),
             Mode::Edit => self.handle_edit(key, stdout),
+            Mode::Replace => self.handle_replace(key, stdout),
             Mode::Command => self.handle_command(key, stdout),
             Mode::Visual => self.handle_visual(key, stdout),
         }
@@ -47,12 +49,20 @@ impl<'a> KeyHandler<'a> {
                 self.editor.update_view();
                 self.editor.update_cursor(stdout)?;
             }
+            Key::Char('r') => {
+                self.editor.set_mode(Mode::Replace);
+            }
             Key::Char('s') => {
                 self.editor.delete_under_cursor();
                 self.editor.update_view();
                 self.editor.update_cursor(stdout)?;
                 self.editor.set_mode(Mode::Edit);
             }
+            Key::Char('b') => {}
+            Key::Char('w') => {}
+            Key::Char('e') => {}
+            Key::Char('/') => {}
+            Key::Char('?') => {}
             Key::Char('v') => {
                 self.editor.set_mode(Mode::Visual);
             }
@@ -135,6 +145,26 @@ impl<'a> KeyHandler<'a> {
             _ => {}
         }
 
+        Ok(())
+    }
+    fn handle_replace(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
+        match key {
+            Key::Char(c) => {
+                self.editor.delete_under_cursor();
+                self.editor
+                    .buffer
+                    .insert_char(&(crate::buffer::Location::from(self.editor.cursor)), c);
+                self.editor.update_view();
+                self.editor.update_cursor(stdout)?;
+                self.editor.set_mode(Mode::Normal);
+            }
+            Key::Esc => {
+                self.editor.set_mode(Mode::Normal);
+                self.editor.update_view();
+                self.editor.update_cursor(stdout)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
     fn handle_command(&mut self, key: Key, stdout: &mut std::io::Stdout) -> Result<()> {
