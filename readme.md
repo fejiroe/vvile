@@ -6,7 +6,6 @@ simple modal editor in rust.
 
 todo:
 
-- refactor key handling into separate file
 - undo/redo
 - about / help / man screen/popup
 - more motions

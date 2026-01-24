@@ -9,3 +9,5 @@ pub mod view;
 pub use view::View;
 pub mod cursor;
 pub use cursor::Cursor;
+pub mod keyhandler;
+pub use keyhandler::KeyHandler;
