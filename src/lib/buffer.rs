@@ -31,11 +31,13 @@ impl Line {
         self.graphemes = offsets;
     }
     pub fn insert(&mut self, i: usize, c: char) {
+        debug_assert!(i <= self.grapheme_len(), "insert index out of bounds");
         let byte_offset = self.graphemes[i];
         self.raw.insert(byte_offset, c);
         self.rebuild();
     }
     pub fn remove(&mut self, i: usize) {
+        debug_assert!(i < self.grapheme_len(), "remove index out of bounds");
         let start = self.graphemes[i];
         let end = self.graphemes[i + 1];
         self.raw.replace_range(start..end, "");
@@ -136,5 +138,41 @@ impl Buffer {
             self.lines.push(Line::new());
         }
         Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn insert_and_remove_single_char() {
+        let mut buf = Buffer::default();
+        // insert a char at the start
+        buf.insert_char(&Location { x: 0, y: 0 }, 'a');
+        assert_eq!(buf.line_at(0), "a");
+        // remove it
+        assert!(buf.delete_char(&Location { x: 0, y: 0 }));
+    }
+
+    #[test]
+    fn buffer_to_string_ignores_final_empty_line() {
+        let mut buf = Buffer::default();
+        buf.insert_char(&Location { x: 0, y: 0 }, 'x');
+        // add an empty line at the end explicitly
+        buf.lines.push(Line::new());
+        assert_eq!(buf.line_count(), 2);
+        // buffer_to_string should drop it
+        assert_eq!(buf.buffer_to_string(), "x");
+    }
+
+    #[test]
+    fn grapheme_indices_are_correct() {
+        let mut line = Line::new();
+        line.push_str("👩‍❤️‍💋‍👨"); // complex emoji (4 graphemes)
+        assert_eq!(line.grapheme_len(), 4);
+        // each grapheme slices correctly
+        assert_eq!(line.grapheme_at(0).unwrap(), "👩");
+        assert_eq!(line.grapheme_at(1).unwrap(), "‍❤️‍💋");
+        assert_eq!(line.grapheme_at(2).unwrap(), "👨");
     }
 }
