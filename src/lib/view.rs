@@ -19,7 +19,7 @@ impl View {
         let max_cols = cols as usize;
         let max_rows = rows as usize;
         let start_line = self.offset_y;
-        let end_line = usize::min(start_line + max_rows, buffer.line_count());
+        let end_line = start_line.saturating_add(max_rows).min(buffer.line_count());
         for line in &buffer.lines[start_line..end_line] {
             let start_grapheme = self.offset_x.min(line.grapheme_len());
             let end_grapheme = usize::min(start_grapheme + max_cols, line.grapheme_len());
