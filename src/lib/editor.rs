@@ -74,6 +74,24 @@ impl Editor {
             Key::Down => self.cursor.move_down(&self.buffer),
             _ => {}
         }
+        let max_y = self.buffer.line_count();
+        debug_assert!(
+            self.cursor.y < max_y,
+            "Cursor y out of bounds: {} >= {}",
+            self.cursor.y,
+            max_y
+        );
+        let line_len = if self.cursor.y < max_y {
+            self.buffer.lines[self.cursor.y].grapheme_len()
+        } else {
+            0
+        };
+        debug_assert!(
+            self.cursor.x <= line_len,
+            "Cursor x out of bounds: {} > {}",
+            self.cursor.x,
+            line_len
+        );
         Ok(())
     }
     pub fn delete_under_cursor(&mut self) {
@@ -108,5 +126,89 @@ impl Editor {
             term.stdout.flush().unwrap();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::buffer::{Line, Location};
+    use std::fs;
+    use std::path::PathBuf;
+
+    // Helper to create a temporary file path
+    fn temp_file_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(name)
+    }
+
+    #[test]
+    fn test_open_nonexistent_file() {
+        let mut editor = Editor::default();
+        let path = temp_file_path("test_nonexistent_editor.txt");
+        if path.exists() {
+            fs::remove_file(&path).unwrap();
+        }
+        editor.open_file(&path).expect("open_file");
+        assert_eq!(editor.current_file().as_ref(), Some(&path));
+        assert_eq!(editor.buffer.line_count(), 1);
+        assert_eq!(editor.buffer.lines[0].grapheme_len(), 0);
+    }
+
+    #[test]
+    fn test_write_file() {
+        let mut editor = Editor::default();
+        // Insert "hello" into buffer
+        for (i, c) in "hello".chars().enumerate() {
+            editor.buffer.insert_char(&Location { x: i, y: 0 }, c);
+        }
+        let path = temp_file_path("test_write_editor.txt");
+        if path.exists() {
+            fs::remove_file(&path).unwrap();
+        }
+        editor.write_file(&path).expect("write_file");
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn test_delete_under_cursor_removes_character() {
+        let mut editor = Editor::default();
+        editor.buffer.lines[0] = Line::from_string("abc".to_owned());
+        editor
+            .buffer
+            .lines
+            .push(Line::from_string("def".to_owned()));
+        editor.cursor.y = 0;
+        editor.cursor.x = 1; // on 'b'
+        editor.delete_under_cursor();
+        assert_eq!(editor.buffer.lines[0].as_str(), "ac");
+        assert_eq!(editor.buffer.line_count(), 2);
+    }
+
+    #[test]
+    fn test_delete_under_cursor_merges_line_and_next() {
+        let mut editor = Editor::default();
+        editor.buffer.lines[0] = Line::from_string("abc".to_owned());
+        editor
+            .buffer
+            .lines
+            .push(Line::from_string("def".to_owned()));
+        editor.cursor.y = 0;
+        editor.cursor.x = 3; // at end of line
+        editor.delete_under_cursor();
+        assert_eq!(editor.buffer.line_count(), 1);
+        assert_eq!(editor.buffer.lines[0].as_str(), "abcdef");
+    }
+
+    #[test]
+    fn test_open_existing_file() {
+        let path = temp_file_path("test_open.txt");
+        let content = "line1\nline2";
+        fs::write(&path, content).unwrap();
+        let mut editor = Editor::default();
+        editor.open_file(&path).expect("open_existing");
+        assert_eq!(editor.buffer.line_count(), 2);
+        assert_eq!(editor.buffer.lines[0].as_str(), "line1");
+        assert_eq!(editor.buffer.lines[1].as_str(), "line2");
     }
 }
