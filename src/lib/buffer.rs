@@ -117,10 +117,8 @@ impl Buffer {
     }
     pub fn buffer_to_string(&self) -> String {
         let mut out = self.lines.iter().map(|l| l.as_str()).collect::<Vec<_>>();
-        if let Some(last) = out.last() {
-            if last.is_empty() {
+        if let Some(last) = out.last() && last.is_empty() {
                 out.pop();
-            }
         }
         out.join("\n")
     }
